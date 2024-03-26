@@ -1,5 +1,5 @@
 module "database" {
-  source = "github.com/cds-snc/terraform-modules//rds?ref=v9.2.6"
+  source = "github.com/cds-snc/terraform-modules//rds?ref=v9.2.7"
   name   = var.project_name
 
   database_name  = "test"
@@ -14,6 +14,7 @@ module "database" {
   preferred_backup_window             = "02:00-04:00"
   performance_insights_enabled        = false
   iam_database_authentication_enabled = true
+  upgrade_immediately                 = true
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnet_ids
@@ -33,4 +34,14 @@ resource "aws_ssm_parameter" "database_password" {
   type  = "SecureString"
   value = var.database_password
   tags  = local.common_tags
+}
+
+resource "aws_kms_key" "database_activity_stream" {
+  description = "AWS KMS Key to encrypt the database activity stream"
+}
+
+resource "aws_rds_cluster_activity_stream" "database" {
+  resource_arn = module.database.rds_cluster_arn
+  mode         = "async"
+  kms_key_id   = aws_kms_key.database_activity_stream.key_id
 }
