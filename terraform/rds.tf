@@ -6,7 +6,7 @@ module "database" {
   engine         = "aurora-postgresql"
   engine_version = "15.2"
   instances      = 2
-  instance_class = "db.r4.large" # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/DBActivityStreams.Overview.html#DBActivityStreams.Overview.requirements.classes
+  instance_class = "db.r6g.large" # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/DBActivityStreams.Overview.html#DBActivityStreams.Overview.requirements.classes
   username       = var.database_username
   password       = var.database_password
 
