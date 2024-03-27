@@ -1,6 +1,6 @@
 {
 	"name": "aws-rds-kinesis-activity-stream",
-	"image": "mcr.microsoft.com/devcontainers/base:bullseye",
+	"image": "mcr.microsoft.com/devcontainers/python:3.12",
 	"containerEnv": {
 		"SHELL": "/bin/zsh"
 	},
