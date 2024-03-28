@@ -1,5 +1,5 @@
 # AWS RDS to Kinesis database activity stream
-Creates an RDS cluster with an activity stream enabled.  This is then used as a source for Kinesis which invokes a Lambda function to decrypt the activity and save it to an S3 bucket.
+Creates an RDS cluster with an activity stream enabled.  This is then used as a source for Kinesis Firehose which uses a Lambda function to decrypt the activity and save it to an S3 bucket.
 
 ```sh
 # To setup, run the following from the devcontainer

@@ -18,18 +18,28 @@ RDS_ACTIVITY_STREAM_ID = RDS_ACTIVITY_STREAM_NAME[len('aws-rds-das-'):]
 
 enc_client = aws_encryption_sdk.EncryptionSDKClient(commitment_policy=CommitmentPolicy.FORBID_ENCRYPT_ALLOW_DECRYPT)
 kms = boto3.client('kms', region_name=AWS_REGION)
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.ERROR)
 
 def handler(event, context):
-    logging.info(f"Received {len(event['Records'])} Kinesis records to process...")
-    for record in event['Records']:
-        record_data = base64.b64decode(record['kinesis']['data'])
+    output = []
+    logging.info(f"Received {len(event['records'])} Kinesis records to process...")
+    
+    for record in event['records']:
+        record_data = base64.b64decode(record['data'])
         record_data = json.loads(record_data)
         payload_decoded = base64.b64decode(record_data['databaseActivityEvents'])
         data_key_decoded = base64.b64decode(record_data['key'])
         data_key_decrypt_result = kms.decrypt(CiphertextBlob=data_key_decoded, EncryptionContext={'aws:rds:dbc-id': RDS_ACTIVITY_STREAM_ID})
-        logging.info(decrypt_decompress(payload_decoded, data_key_decrypt_result['Plaintext']))
-    return True
+        plain_text = decrypt_decompress(payload_decoded, data_key_decrypt_result['Plaintext'])
+
+        output_record = {
+            'recordId': record['recordId'],
+            'result': 'Ok',
+            'data': base64.b64encode(plain_text).decode('utf-8')
+        }
+        output.append(output_record)
+        
+    return {'records': output}
 
 
 class MyRawMasterKeyProvider(RawMasterKeyProvider):

@@ -133,7 +133,6 @@ data "aws_iam_policy_document" "decrypt" {
     ]
   }
 
-
   statement {
     sid    = "KMSDecryptDatabaseActivityStream"
     effect = "Allow"
@@ -146,13 +145,10 @@ data "aws_iam_policy_document" "decrypt" {
   }
 }
 
-#
-# Allow Kinesis to trigger the function
-#
-resource "aws_lambda_event_source_mapping" "activity_stream_decrypt" {
-  function_name     = aws_lambda_function.decrypt.arn
-  event_source_arn  = local.database_kinesis_stream_arn
-  batch_size        = 100
-  enabled           = true
-  starting_position = "LATEST"
+resource "aws_lambda_permission" "lambda_permission" {
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.decrypt.function_name
+  principal     = "firehose.amazonaws.com"
+  source_arn    = aws_kinesis_firehose_delivery_stream.activity_stream.arn
 }
+
