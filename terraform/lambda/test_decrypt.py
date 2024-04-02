@@ -76,7 +76,7 @@ def test_my_raw_master_key_provider_get_raw_key():
 )
 @patch("decrypt.enc_client.decrypt")
 def test_decrypt_payload(mock_decrypt, mock_materials_manager, mock_key_provider):
-    mock_decrypt.return_value = (b"decrypted_plaintext", "header")
+    mock_decrypt.return_value = b"decrypted_plaintext"
     mock_key_provider_instance = mock_key_provider.return_value
     mock_materials_manager_instance = mock_materials_manager.return_value
     payload = b"encrypted_payload"

@@ -1,4 +1,9 @@
-# https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/DBActivityStreams.Monitoring.html#DBActivityStreams.CodeExample
+# pylint: disable=line-too-long
+"""
+Kinesis Firehose Lambda function to process RDS activity stream records.  This is based off
+the example provided by AWS:
+https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/DBActivityStreams.Monitoring.html#DBActivityStreams.CodeExample
+"""
 import base64
 import json
 import logging
@@ -23,9 +28,13 @@ kms = boto3.client("kms", region_name=AWS_REGION)
 logging.getLogger().setLevel(logging.ERROR)
 
 
+# pylint: disable=unused-argument
 def handler(event, context):
+    """
+    Handle the RDS activity stream events.  Decrypt and decompress the payload and returns
+    the plaintext data.
+    """
     output = []
-    logging.info(f"Received {len(event['records'])} Kinesis records to process...")
 
     for record in event["records"]:
         record_data = base64.b64decode(record["data"])
@@ -51,6 +60,11 @@ def handler(event, context):
 
 
 class MyRawMasterKeyProvider(RawMasterKeyProvider):
+    """
+    Takes the raw key matrial and provides a WrappingKey
+    that can be used for cryptographic operations.
+    """
+
     provider_id = "BC"
 
     def __new__(cls, *args, **kwargs):
@@ -70,9 +84,12 @@ class MyRawMasterKeyProvider(RawMasterKeyProvider):
 
 
 def decrypt_payload(payload, data_key):
+    """
+    Decrypt the payload using the AWS Encryption SDK and the provided raw data key.
+    """
     my_key_provider = MyRawMasterKeyProvider(data_key)
     my_key_provider.add_master_key("DataKey")
-    decrypted_plaintext, header = enc_client.decrypt(
+    decrypted_plaintext = enc_client.decrypt(
         source=payload,
         materials_manager=aws_encryption_sdk.materials_managers.default.DefaultCryptoMaterialsManager(
             master_key_provider=my_key_provider
@@ -82,5 +99,8 @@ def decrypt_payload(payload, data_key):
 
 
 def decrypt_decompress(payload, key):
+    """
+    Decrypt and decompress the payload using the provided key.
+    """
     decrypted = decrypt_payload(payload, key)
     return zlib.decompress(decrypted, zlib.MAX_WBITS + 16)
