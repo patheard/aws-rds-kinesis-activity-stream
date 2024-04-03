@@ -116,15 +116,18 @@ def decrypt_decompress(payload, key):
 def get_filtered_events(plaintext_events):
     """
     Determine if the database event should be included in the output.
-    Currently filters out all heartbeat events
+    Currently filters out all heartbeat and RDS proxy admin events.
     """
     events = json.loads(plaintext_events)
-    db_activity = events.get("databaseActivityEvents", [])
+    db_activity = events.get("databaseActivityEventList", [])
     db_activity_filtered = [
-        event for event in db_activity if event.get("type") != "heartbeat"
+        event
+        for event in db_activity
+        if event.get("type") != "heartbeat"
+        and event.get("dbUserName") != "rdsproxyadmin"
     ]
 
     if db_activity_filtered:
-        events["databaseActivityEvents"] = db_activity_filtered
+        events["databaseActivityEventList"] = db_activity_filtered
         return json.dumps(events)
     return None

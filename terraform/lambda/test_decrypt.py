@@ -31,7 +31,7 @@ def sample_event():
 @patch("decrypt.kms.decrypt")
 def test_handler(mock_kms_decrypt, mock_decrypt_decompress, sample_event):
     mock_decrypt_decompress.return_value = (
-        b'{"databaseActivityEvents":[{"type":"READ"}]}'
+        b'{"databaseActivityEventList":[{"type":"READ"}]}'
     )
     mock_kms_decrypt.return_value = {
         "Plaintext": b"sample_plaintext",
@@ -51,9 +51,9 @@ def test_handler(mock_kms_decrypt, mock_decrypt_decompress, sample_event):
     assert result == {
         "records": [
             {
+                "data": b"eyJkYXRhYmFzZUFjdGl2aXR5RXZlbnRMaXN0IjogW3sidHlwZSI6ICJSRUFEIn1dfQ==",
                 "recordId": "12345",
                 "result": "Ok",
-                "data": b"eyJkYXRhYmFzZUFjdGl2aXR5RXZlbnRzIjogW3sidHlwZSI6ICJSRUFEIn1dfQ==",
             }
         ]
     }
@@ -123,25 +123,26 @@ def test_decrypt_decompress(mock_decompress, mock_decrypt_payload):
     assert result == b"decompressed_payload"
 
 
-def test_get_filtered_events_no_heartbeat():
+def test_get_filtered_events_all_valid():
     plaintext_events = json.dumps(
-        {"databaseActivityEvents": [{"type": "READ"}, {"type": "WRITE"}]}
+        {"databaseActivityEventList": [{"type": "READ"}, {"type": "WRITE"}]}
     )
     result = get_filtered_events(plaintext_events)
 
     assert result is not None
     result_json = json.loads(result)
-    assert "databaseActivityEvents" in result_json
-    assert len(result_json["databaseActivityEvents"]) == 2
+    assert "databaseActivityEventList" in result_json
+    assert len(result_json["databaseActivityEventList"]) == 2
 
 
-def test_get_filtered_events_with_heartbeat():
+def test_get_filtered_events_with_some_valid():
     plaintext_events = json.dumps(
         {
-            "databaseActivityEvents": [
+            "databaseActivityEventList": [
                 {"type": "READ"},
                 {"type": "heartbeat"},
                 {"type": "WRITE"},
+                {"dbUserName": "rdsproxyadmin"},
             ]
         }
     )
@@ -149,16 +150,22 @@ def test_get_filtered_events_with_heartbeat():
 
     assert result is not None
     result_json = json.loads(result)
-    assert "databaseActivityEvents" in result_json
-    assert len(result_json["databaseActivityEvents"]) == 2
+    assert "databaseActivityEventList" in result_json
+    assert len(result_json["databaseActivityEventList"]) == 2
     assert all(
-        event["type"] != "heartbeat" for event in result_json["databaseActivityEvents"]
+        event["type"] != "heartbeat"
+        for event in result_json["databaseActivityEventList"]
     )
 
 
-def test_get_filtered_events_all_heartbeat():
+def test_get_filtered_events_all_filtered():
     plaintext_events = json.dumps(
-        {"databaseActivityEvents": [{"type": "heartbeat"}, {"type": "heartbeat"}]}
+        {
+            "databaseActivityEventList": [
+                {"type": "heartbeat"},
+                {"dbUserName": "rdsproxyadmin"},
+            ]
+        }
     )
     result = get_filtered_events(plaintext_events)
 
@@ -166,7 +173,7 @@ def test_get_filtered_events_all_heartbeat():
 
 
 def test_get_filtered_events_empty():
-    plaintext_events = json.dumps({"databaseActivityEvents": []})
+    plaintext_events = json.dumps({"databaseActivityEventList": []})
     result = get_filtered_events(plaintext_events)
 
     assert result is None
