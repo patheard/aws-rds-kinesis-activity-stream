@@ -28,8 +28,7 @@ kms = boto3.client("kms", region_name=AWS_REGION)
 logging.getLogger().setLevel(logging.ERROR)
 
 
-# pylint: disable=unused-argument
-def handler(event, context):
+def handler(event, _context):
     """
     Handle the RDS activity stream events.  Decrypt and decompress the payload and returns
     the plaintext data.
@@ -89,7 +88,7 @@ def decrypt_payload(payload, data_key):
     """
     my_key_provider = MyRawMasterKeyProvider(data_key)
     my_key_provider.add_master_key("DataKey")
-    decrypted_plaintext = enc_client.decrypt(
+    decrypted_plaintext, _header = enc_client.decrypt(
         source=payload,
         materials_manager=aws_encryption_sdk.materials_managers.default.DefaultCryptoMaterialsManager(
             master_key_provider=my_key_provider
