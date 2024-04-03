@@ -48,11 +48,19 @@ def handler(event, _context):
             payload_decoded, data_key_decrypt_result["Plaintext"]
         )
 
-        output_record = {
-            "recordId": record["recordId"],
-            "result": "Ok",
-            "data": base64.b64encode(plain_text).decode("utf-8"),
-        }
+        filtered_events = get_filtered_events(plain_text)
+        if filtered_events:
+            output_record = {
+                "recordId": record["recordId"],
+                "result": "Ok",
+                "data": base64.b64encode(filtered_events.encode("utf-8")),
+            }
+        else:
+            output_record = {
+                "recordId": record["recordId"],
+                "result": "Dropped",
+                "data": base64.b64encode(b"Event filtered"),
+            }
         output.append(output_record)
 
     return {"records": output}
@@ -103,3 +111,20 @@ def decrypt_decompress(payload, key):
     """
     decrypted = decrypt_payload(payload, key)
     return zlib.decompress(decrypted, zlib.MAX_WBITS + 16)
+
+
+def get_filtered_events(plaintext_events):
+    """
+    Determine if the database event should be included in the output.
+    Currently filters out all heartbeat events
+    """
+    events = json.loads(plaintext_events)
+    db_activity = events.get("databaseActivityEvents", [])
+    db_activity_filtered = [
+        event for event in db_activity if event.get("type") != "heartbeat"
+    ]
+
+    if db_activity_filtered:
+        events["databaseActivityEvents"] = db_activity_filtered
+        return json.dumps(events)
+    return None

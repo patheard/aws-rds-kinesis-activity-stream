@@ -1,3 +1,4 @@
+import json
 import pytest
 import zlib
 from unittest.mock import patch
@@ -5,7 +6,13 @@ from unittest.mock import patch
 from aws_encryption_sdk.identifiers import WrappingAlgorithm, EncryptionKeyType
 from aws_encryption_sdk.key_providers.raw import RawMasterKeyProvider, WrappingKey
 
-from decrypt import handler, decrypt_decompress, decrypt_payload, MyRawMasterKeyProvider
+from decrypt import (
+    get_filtered_events,
+    handler,
+    decrypt_decompress,
+    decrypt_payload,
+    MyRawMasterKeyProvider,
+)
 
 
 @pytest.fixture
@@ -23,7 +30,9 @@ def sample_event():
 @patch("decrypt.decrypt_decompress")
 @patch("decrypt.kms.decrypt")
 def test_handler(mock_kms_decrypt, mock_decrypt_decompress, sample_event):
-    mock_decrypt_decompress.return_value = b"decrypted_data"
+    mock_decrypt_decompress.return_value = (
+        b'{"databaseActivityEvents":[{"type":"READ"}]}'
+    )
     mock_kms_decrypt.return_value = {
         "Plaintext": b"sample_plaintext",
         "KeyId": "sample_rds_activity_stream_id",
@@ -41,7 +50,11 @@ def test_handler(mock_kms_decrypt, mock_decrypt_decompress, sample_event):
 
     assert result == {
         "records": [
-            {"recordId": "12345", "result": "Ok", "data": "ZGVjcnlwdGVkX2RhdGE="}
+            {
+                "recordId": "12345",
+                "result": "Ok",
+                "data": b"eyJkYXRhYmFzZUFjdGl2aXR5RXZlbnRzIjogW3sidHlwZSI6ICJSRUFEIn1dfQ==",
+            }
         ]
     }
 
@@ -76,7 +89,7 @@ def test_my_raw_master_key_provider_get_raw_key():
 )
 @patch("decrypt.enc_client.decrypt")
 def test_decrypt_payload(mock_decrypt, mock_materials_manager, mock_key_provider):
-    mock_decrypt.return_value = b"decrypted_plaintext"
+    mock_decrypt.return_value = (b"decrypted_plaintext", "header")
     mock_key_provider_instance = mock_key_provider.return_value
     mock_materials_manager_instance = mock_materials_manager.return_value
     payload = b"encrypted_payload"
@@ -108,3 +121,52 @@ def test_decrypt_decompress(mock_decompress, mock_decrypt_payload):
     mock_decrypt_payload.assert_called_once_with(payload, key)
     mock_decompress.assert_called_once_with(b"decrypted_payload", zlib.MAX_WBITS + 16)
     assert result == b"decompressed_payload"
+
+
+def test_get_filtered_events_no_heartbeat():
+    plaintext_events = json.dumps(
+        {"databaseActivityEvents": [{"type": "READ"}, {"type": "WRITE"}]}
+    )
+    result = get_filtered_events(plaintext_events)
+
+    assert result is not None
+    result_json = json.loads(result)
+    assert "databaseActivityEvents" in result_json
+    assert len(result_json["databaseActivityEvents"]) == 2
+
+
+def test_get_filtered_events_with_heartbeat():
+    plaintext_events = json.dumps(
+        {
+            "databaseActivityEvents": [
+                {"type": "READ"},
+                {"type": "heartbeat"},
+                {"type": "WRITE"},
+            ]
+        }
+    )
+    result = get_filtered_events(plaintext_events)
+
+    assert result is not None
+    result_json = json.loads(result)
+    assert "databaseActivityEvents" in result_json
+    assert len(result_json["databaseActivityEvents"]) == 2
+    assert all(
+        event["type"] != "heartbeat" for event in result_json["databaseActivityEvents"]
+    )
+
+
+def test_get_filtered_events_all_heartbeat():
+    plaintext_events = json.dumps(
+        {"databaseActivityEvents": [{"type": "heartbeat"}, {"type": "heartbeat"}]}
+    )
+    result = get_filtered_events(plaintext_events)
+
+    assert result is None
+
+
+def test_get_filtered_events_empty():
+    plaintext_events = json.dumps({"databaseActivityEvents": []})
+    result = get_filtered_events(plaintext_events)
+
+    assert result is None
